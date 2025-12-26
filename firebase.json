@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "site": "rayka-menu",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

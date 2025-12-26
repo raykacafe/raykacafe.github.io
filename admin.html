@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>پنل مدیریت - کافه رایکا</title>
+  <link rel="icon" type="image/x-icon" href="/images/fav.png">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+
+  <style>
+    body {
+      font-family: 'Vazirmatn', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+    }
+
+    /* صفحه لاگین */
+    .loginPage {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #303E19 0%, #0d4715 100%);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .loginPage.show {
+      display: flex;
+    }
+
+    .login-container {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .login-container h1 {
+      color: #303E19;
+      margin-bottom: 30px;
+      font-size: 1.8em;
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .login-form input {
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1em;
+      font-family: inherit;
+      text-align: right;
+    }
+
+    .login-form input:focus {
+      outline: none;
+      border-color: #303E19;
+      box-shadow: 0 0 0 3px rgba(48, 62, 25, 0.1);
+    }
+
+    .login-form button {
+      padding: 12px;
+      background: #303E19;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+      font-family: inherit;
+    }
+
+    .login-form button:hover {
+      background: #0d4715;
+    }
+
+    .login-error {
+      color: #d32f2f;
+      font-size: 0.9em;
+      margin-top: 10px;
+      display: none;
+    }
+
+    /* صفحه داشبورد */
+    .adminDashboard {
+      display: none;
+    }
+
+    .adminDashboard.show {
+      display: block;
+    }
+
+    .admin-header {
+      background: linear-gradient(135deg, #303E19 0%, #0d4715 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .admin-header h1 {
+      font-size: 1.8em;
+      margin: 0;
+    }
+
+    .logout-btn {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: 2px solid white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+
+    .logout-btn:hover {
+      background: white;
+      color: #303E19;
+    }
+
+    .admin-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .admin-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      border-bottom: 2px solid #D7D168;
+    }
+
+    .admin-tab-btn {
+      padding: 12px 20px;
+      background: transparent;
+      border: none;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      color: #666;
+      transition: all 0.3s;
+      font-family: inherit;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+
+    .admin-tab-btn.active {
+      color: #303E19;
+      border-bottom-color: #D7D168;
+    }
+
+    .admin-tab-content {
+      display: none;
+      animation: fadeIn 0.3s;
+    }
+
+    .admin-tab-content.show {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* بخش مدیریت آیتم ها */
+    .items-management {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .add-item-form {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-group label {
+      font-weight: 600;
+      color: #333;
+      font-size: 0.9em;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.95em;
+      text-align: right;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+      grid-column: 1 / -1;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #303E19;
+      box-shadow: 0 0 0 3px rgba(48, 62, 25, 0.1);
+    }
+
+    .add-item-btn {
+      padding: 12px 20px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+      font-family: inherit;
+      grid-column: 1 / -1;
+    }
+
+    .add-item-btn:hover {
+      background: #45a049;
+    }
+
+    /* جدول آیتم ها */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .items-table thead {
+      background: #303E19;
+      color: white;
+    }
+
+    .items-table th,
+    .items-table td {
+      padding: 12px;
+      text-align: right;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .items-table th {
+      font-weight: 600;
+    }
+
+    .items-table tbody tr:hover {
+      background: #f9f9f9;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-edit,
+    .btn-delete {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9em;
+      transition: all 0.3s;
+    }
+
+    .btn-edit {
+      background: #2196F3;
+      color: white;
+    }
+
+    .btn-edit:hover {
+      background: #1976D2;
+    }
+
+    .btn-delete {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-delete:hover {
+      background: #da190b;
+    }
+
+    /* مودال ویرایش */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #303E19;
+      padding-bottom: 10px;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      color: #303E19;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 1.5em;
+      cursor: pointer;
+      color: #666;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .close-btn:hover {
+      color: #000;
+    }
+
+    .modal-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .modal-form input,
+    .modal-form select,
+    .modal-form textarea {
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 1em;
+      text-align: right;
+    }
+
+    .modal-form textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .edit-image-preview {
+      width: 100%;
+      max-width: 200px;
+      height: auto;
+      border-radius: 6px;
+      margin: 10px 0;
+    }
+
+    .modal-form button {
+      padding: 12px;
+      background: #303E19;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.3s;
+    }
+
+    .modal-form button:hover {
+      background: #0d4715;
+    }
+
+    /* بخش سفارش ها */
+    .orders-section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .orders-filter {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .orders-filter button,
+    .filter-btn {
+      padding: 10px 20px;
+      background: #e0e0e0;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+
+    .orders-filter button.active,
+    .filter-btn.active {
+      background: #303E19;
+      color: white;
+    }
+
+    #orders-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .order-card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #D7D168;
+    }
+
+    .order-id {
+      font-weight: 600;
+      color: #303E19;
+    }
+
+    .order-status {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+
+    .order-status.pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .order-status.completed {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .order-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .order-info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .order-info-label {
+      font-weight: 600;
+      color: #666;
+    }
+
+    .order-items {
+      background: #f9f9f9;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .order-item:last-child {
+      border-bottom: none;
+    }
+
+    .order-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-complete,
+    .btn-delete-order {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+
+    .btn-complete {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .btn-complete:hover {
+      background: #45a049;
+    }
+
+    .btn-delete-order {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-delete-order:hover {
+      background: #da190b;
+    }
+
+    /* بخش گزارش ها */
+    .reports-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .reports-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .report-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .report-card h3 {
+      color: #666;
+      margin: 0 0 10px 0;
+      font-size: 0.9em;
+    }
+
+    .report-card-value {
+      font-size: 2em;
+      font-weight: 700;
+      color: #303E19;
+    }
+
+    .export-btn {
+      padding: 12px 20px;
+      background: #303E19;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.3s;
+    }
+
+    .export-btn:hover {
+      background: #0d4715;
+    }
+
+    .empty-message {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+      font-style: italic;
+    }
+
+    /* رسپانسیو */
+    @media (max-width: 768px) {
+      .add-item-form {
+        grid-template-columns: 1fr;
+      }
+      
+      .items-table {
+        font-size: 0.9em;
+      }
+      
+      .modal-content {
+        width: 95%;
+      }
+      
+      #orders-container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- صفحه لاگین -->
+  <div id="loginPage" class="loginPage show">
+    <div class="login-container">
+      <h1>🔐 پنل مدیریت</h1>
+      <form id="login-form" class="login-form">
+        <input 
+          type="password" 
+          id="admin-password" 
+          placeholder="رمزعبور را وارد کنید" 
+          required
+        >
+        <button type="submit">ورود</button>
+        <div id="login-error" class="login-error"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- داشبورد مدیریت -->
+  <div id="adminDashboard" class="adminDashboard">
+    <!-- هدر -->
+    <div class="admin-header">
+      <h1>📊 پنل مدیریت کافه رایکا</h1>
+      <button id="logout-btn" class="logout-btn">خروج</button>
+    </div>
+
+    <!-- محتوای اصلی -->
+    <div class="admin-container">
+      <!-- تب‌ها -->
+      <div class="admin-tabs">
+        <button class="admin-tab-btn active" data-tab="items">مدیریت منو</button>
+        <button class="admin-tab-btn" data-tab="orders">سفارش‌ها</button>
+        <button class="admin-tab-btn" data-tab="reports">گزارش‌ها</button>
+      </div>
+
+      <!-- تب منو -->
+      <div id="items-tab" class="admin-tab-content show items-management">
+        <h2>➕ اضافه کردن آیتم جدید</h2>
+        <form id="add-item-form" class="add-item-form">
+          <div class="form-group">
+            <label>دسته‌بندی</label>
+            <select id="item-category" required>
+              <option value="">انتخاب کنید</option>
+              <option value="قهوه">قهوه</option>
+              <option value="چای">چای</option>
+              <option value="بستنی">بستنی</option>
+              <option value="کیک">کیک</option>
+              <option value="نوشیدنی">نوشیدنی</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>نام</label>
+            <input type="text" id="item-name" required>
+          </div>
+          <div class="form-group">
+            <label>قیمت (تومان)</label>
+            <input type="number" id="item-price" required>
+          </div>
+          <div class="form-group">
+            <label>توضیح</label>
+            <textarea id="item-description"></textarea>
+          </div>
+          <div class="form-group">
+            <label>عکس</label>
+            <input type="file" id="item-image" accept="image/*">
+          </div>
+          <button type="submit" class="add-item-btn">➕ اضافه کردن</button>
+        </form>
+
+        <h2>📋 لیست آیتم‌ها</h2>
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>نام</th>
+              <th>عکس</th>
+              <th>دسته‌بندی</th>
+              <th>توضیح</th>
+              <th>قیمت</th>
+              <th>عملیات</th>
+            </tr>
+          </thead>
+          <tbody id="items-table-body"></tbody>
+        </table>
+      </div>
+
+      <!-- تب سفارش‌ها -->
+      <div id="orders-tab" class="admin-tab-content orders-section">
+        <h2>📦 سفارش‌ها</h2>
+        <div class="orders-filter">
+          <button class="filter-btn active" data-filter="all">همه</button>
+          <button class="filter-btn" data-filter="pending">در انتظار</button>
+          <button class="filter-btn" data-filter="completed">تکمیل شده</button>
+        </div>
+        <div id="orders-container"></div>
+      </div>
+
+      <!-- تب گزارش‌ها -->
+      <div id="reports-tab" class="admin-tab-content reports-section">
+        <h2>📈 گزارش‌ها</h2>
+        
+        <div class="reports-grid">
+          <div class="report-card">
+            <h3>کل سفارش‌ها</h3>
+            <div id="total-orders" class="report-card-value">0</div>
+          </div>
+          <div class="report-card">
+            <h3>سفارش‌های تکمیل شده</h3>
+            <div id="completed-orders" class="report-card-value">0</div>
+          </div>
+          <div class="report-card">
+            <h3>کل درآمد</h3>
+            <div id="total-revenue" class="report-card-value">0 تومان</div>
+          </div>
+          <div class="report-card">
+            <h3>میانگین سفارش</h3>
+            <div id="average-order" class="report-card-value">0 تومان</div>
+          </div>
+        </div>
+
+        <h3>🔥 محبوب‌ترین آیتم‌ها</h3>
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>نام</th>
+              <th>تعداد</th>
+              <th>درآمد</th>
+            </tr>
+          </thead>
+          <tbody id="popular-items-body"></tbody>
+        </table>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+          <button id="export-csv-btn" class="export-btn">📥 دانلود CSV</button>
+          <button id="export-pdf-btn" class="export-btn">📥 چاپ (PDF)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال ویرایش آیتم -->
+  <div id="edit-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>✏️ ویرایش آیتم</h2>
+        <button type="button" class="close-btn">✕</button>
+      </div>
+      <form id="edit-item-form" class="modal-form">
+        <div class="form-group">
+          <label>نام</label>
+          <input type="text" id="edit-name" required>
+        </div>
+        <div class="form-group">
+          <label>دسته‌بندی</label>
+          <select id="edit-category" required>
+            <option value="">انتخاب کنید</option>
+            <option value="قهوه">قهوه</option>
+            <option value="چای">چای</option>
+            <option value="بستنی">بستنی</option>
+            <option value="کیک">کیک</option>
+            <option value="نوشیدنی">نوشیدنی</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>قیمت (تومان)</label>
+          <input type="number" id="edit-price" required>
+        </div>
+        <div class="form-group">
+          <label>توضیح</label>
+          <textarea id="edit-description"></textarea>
+        </div>
+        <div class="form-group">
+          <label>عکس جدید (اختیاری)</label>
+          <input type="file" id="edit-image" accept="image/*">
+          <img id="edit-image-preview" class="edit-image-preview" style="display: none;">
+        </div>
+        <button type="submit">💾 ذخیره تغییرات</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
