@@ -6,8 +6,18 @@ import {
   getDocs,
   deleteDoc,
   doc,
-  updateDoc
+  updateDoc,
+  setDoc,
+  onSnapshot,
+  query
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
 // 🔹 Firebase config
 const firebaseConfig = {
@@ -22,6 +32,11 @@ const firebaseConfig = {
 // 🔹 Init Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
+
+// categories map: { [categoryName]: { name, icon, iconPath } }
+let categoriesMap = {};
+let categoriesUnsubscribe = null;
 
 console.log("🔥 Firebase connected");
 
@@ -33,6 +48,7 @@ let menuData = [];
 let orders = [];
 let nextOrderId = 1;
 let nextItemId = 1;
+let firestoreUnsubscribe = null;
 
 // DOM Elements
 let loginPage, adminDashboard;
@@ -63,8 +79,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ============================================
 async function loadAllData() {
   try {
-    // Load menu from Firebase
-    await loadMenuFromFirestore();
+    // Load menu from Firebase with real-time listener
+    setupMenuRealtimeListener();
+    // Load categories (icons) with real-time listener
+    setupCategoriesRealtimeListener();
     
     // Load orders from localStorage
     orders = JSON.parse(localStorage.getItem('orders')) || [];
@@ -76,52 +94,99 @@ async function loadAllData() {
   }
 }
 
-// Load menu from Firestore
-async function loadMenuFromFirestore() {
-  try {
-    const snapshot = await getDocs(collection(db, "menu"));
-    
-    // Group items by category
-    const categoriesMap = {};
-    
+// Setup categories listener
+function setupCategoriesRealtimeListener() {
+  if (categoriesUnsubscribe) categoriesUnsubscribe();
+  categoriesUnsubscribe = onSnapshot(query(collection(db, 'categories')), (snapshot) => {
+    const map = {};
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      const category = data.category || 'Other';
+      map[docSnap.id] = {
+        name: data.name || docSnap.id,
+        icon: data.icon || '',
+        iconPath: data.iconPath || ''
+      };
+    });
+    categoriesMap = map;
+    // refresh admin items table if open
+    if (adminInitialized) loadItemsTable();
+  }, (err) => console.error('❌ categories listener error', err));
+}
+
+// Upload file to storage and return { url, path }
+async function uploadFileToStorage(file, destPath) {
+  const ref = storageRef(storage, destPath);
+  await uploadBytes(ref, file);
+  const url = await getDownloadURL(ref);
+  return { url, path: destPath };
+}
+
+// Try delete file at storage path (silent on error)
+async function tryDeleteStoragePath(path) {
+  if (!path) return;
+  try {
+    const ref = storageRef(storage, path);
+    await deleteObject(ref);
+  } catch (e) {
+    console.warn('failed to delete storage object', path, e);
+  }
+}
+
+// Setup real-time listener for menu from Firestore
+function setupMenuRealtimeListener() {
+  if (firestoreUnsubscribe) {
+    firestoreUnsubscribe();
+  }
+
+  const menuQuery = query(collection(db, "menu"));
+  
+  firestoreUnsubscribe = onSnapshot(menuQuery, (snapshot) => {
+    try {
+      // Group items by category
+      const categoriesMap = {};
       
-      if (!categoriesMap[category]) {
-        categoriesMap[category] = {
-          category: category,
-          items: []
-        };
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const category = data.category || 'Other';
+        
+        if (!categoriesMap[category]) {
+          categoriesMap[category] = {
+            category: category,
+            items: []
+          };
+        }
+        
+        categoriesMap[category].items.push({
+          id: data.id || docSnap.id,
+          name: data.name,
+          description: data.description,
+          price: data.price,
+          image: data.image,
+          imagePath: data.imagePath || null,
+          docId: docSnap.id // Store Firebase doc ID for updates
+        });
+      });
+      
+      menuData = Object.values(categoriesMap);
+      
+      // Calculate nextItemId
+      const allItems = menuData.flatMap(cat => cat.items || []);
+      nextItemId = allItems.length > 0 
+        ? Math.max(...allItems.map(item => item.id || 0)) + 1 
+        : 1;
+      
+      // Update the items table if admin is logged in
+      if (adminInitialized) {
+        loadItemsTable();
       }
       
-      categoriesMap[category].items.push({
-        id: data.id || docSnap.id,
-        name: data.name,
-        description: data.description,
-        price: data.price,
-        image: data.image,
-        docId: docSnap.id // Store Firebase doc ID for updates
-      });
-    });
-    
-    menuData = Object.values(categoriesMap);
-    
-    // Calculate nextItemId
-    const allItems = menuData.flatMap(cat => cat.items || []);
-    nextItemId = allItems.length > 0 
-      ? Math.max(...allItems.map(item => item.id || 0)) + 1 
-      : 1;
-    
-    console.log('✅ Menu loaded from Firestore:', menuData);
-  } catch (err) {
-    console.error('❌ Error loading menu from Firestore:', err);
-    // Load from localStorage as fallback
-    try {
-      const saved = JSON.parse(localStorage.getItem('menuData'));
-      if (saved) menuData = saved;
-    } catch (e) {}
-  }
+      console.log('✅ Menu loaded from Firestore:', menuData);
+    } catch (err) {
+      console.error('❌ Error processing menu snapshot:', err);
+    }
+  }, (error) => {
+    console.error('❌ Error setting up real-time listener:', error);
+  });
 }
 
 // ============================================
@@ -282,24 +347,40 @@ function setupMenuManagement() {
     const description = document.getElementById('item-description').value.trim();
     const price = parseInt(document.getElementById('item-price').value) || 0;
     const imageFile = document.getElementById('item-image')?.files[0];
-    
+    const categoryIconFile = document.getElementById('category-icon')?.files[0];
+
     if (!category || !name || !price) {
       alert('لطفاً تمام فیلدهای اجباری را پر کنید');
       return;
     }
     
     try {
-      let imageData = null;
-      
-      // Convert image to base64
+      let imageUrl = null;
+      let imagePath = null;
+
+      // If item image provided, upload to storage
       if (imageFile) {
-        imageData = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(imageFile);
-        });
+        const dest = `menu_images/${Date.now()}_${imageFile.name}`;
+        const uploaded = await uploadFileToStorage(imageFile, dest);
+        imageUrl = uploaded.url;
+        imagePath = uploaded.path;
       }
-      
+
+      // If category icon provided, upload and ensure categories doc
+      if (categoryIconFile) {
+        const dest = `category_icons/${category}_${Date.now()}_${categoryIconFile.name}`;
+        const uploaded = await uploadFileToStorage(categoryIconFile, dest);
+        try {
+          await setDoc(doc(db, 'categories', category), {
+            name: category,
+            icon: uploaded.url,
+            iconPath: uploaded.path
+          });
+        } catch (e) {
+          console.error('❌ failed to set category doc', e);
+        }
+      }
+
       // Add to Firebase
       const docRef = await addDoc(collection(db, 'menu'), {
         id: nextItemId,
@@ -307,37 +388,31 @@ function setupMenuManagement() {
         description,
         price,
         category,
-        image: imageData,
+        image: imageUrl,
+        imagePath: imagePath || null,
         createdAt: new Date().toISOString()
       });
-      
+
       // Update local menuData
       let cat = menuData.find(c => c.category === category);
       if (!cat) {
         cat = { category, items: [] };
         menuData.push(cat);
       }
-      
+
       cat.items.push({
         id: nextItemId,
         name,
         description,
         price,
-        image: imageData,
+        image: imageUrl,
+        imagePath: imagePath || null,
         docId: docRef.id
       });
-      
+
       nextItemId++;
-      
-      // Save to localStorage
-      try {
-        localStorage.setItem('menuData', JSON.stringify(menuData));
-      } catch (e) {
-        console.warn('Failed to save to localStorage');
-      }
-      
+
       addItemForm.reset();
-      loadItemsTable();
       alert('✅ آیتم با موفقیت اضافه شد!');
     } catch (err) {
       console.error('❌ Error adding item:', err);
@@ -428,26 +503,34 @@ function setupEditModal() {
       
       const oldItem = oldCat.items[oldItemIndex];
       let newImage = oldItem.image;
-      
-      // Handle new image
+      let newImagePath = oldItem.imagePath || null;
+
+      // Handle new image upload
       if (imageFile) {
-        newImage = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(imageFile);
-        });
+        // upload new image
+        const dest = `menu_images/${Date.now()}_${imageFile.name}`;
+        const uploaded = await uploadFileToStorage(imageFile, dest);
+        newImage = uploaded.url;
+        newImagePath = uploaded.path;
+
+        // delete old image from storage if we have path
+        if (oldItem.imagePath) {
+          tryDeleteStoragePath(oldItem.imagePath);
+        }
       }
-      
+
       // Update in Firebase
       if (docId) {
-        await updateDoc(doc(db, 'menu', docId), {
+        const updatePayload = {
           name: newName,
           description: newDescription,
           price: newPrice,
           category: newCategory,
           image: newImage,
           updatedAt: new Date().toISOString()
-        });
+        };
+        if (newImagePath) updatePayload.imagePath = newImagePath;
+        await updateDoc(doc(db, 'menu', docId), updatePayload);
       }
       
       // Handle category change
@@ -482,15 +565,7 @@ function setupEditModal() {
         oldItem.image = newImage;
       }
       
-      // Save to localStorage
-      try {
-        localStorage.setItem('menuData', JSON.stringify(menuData));
-      } catch (e) {
-        console.warn('Failed to save to localStorage');
-      }
-      
       editModal.classList.remove('show');
-      loadItemsTable();
       alert('✅ آیتم با موفقیت ویرایش شد!');
     } catch (err) {
       console.error('❌ Error updating item:', err);
@@ -551,12 +626,17 @@ function deleteItem(itemId, category) {
   if (itemIndex === -1) return;
   
   const docId = cat.items[itemIndex].docId;
+  const imagePath = cat.items[itemIndex].imagePath || null;
   
   // Delete from Firebase
   if (docId) {
     deleteDoc(doc(db, 'menu', docId)).catch(err => {
       console.error('❌ Error deleting from Firebase:', err);
     });
+    // delete image from storage if we have a path
+    if (imagePath) {
+      tryDeleteStoragePath(imagePath);
+    }
   }
   
   // Delete from local
@@ -565,13 +645,6 @@ function deleteItem(itemId, category) {
   // Remove category if empty
   if (cat.items.length === 0) {
     menuData = menuData.filter(c => c.category !== category);
-  }
-  
-  // Save to localStorage
-  try {
-    localStorage.setItem('menuData', JSON.stringify(menuData));
-  } catch (e) {
-    console.warn('Failed to save to localStorage');
   }
   
   loadItemsTable();
@@ -786,8 +859,8 @@ function setupExportButtons() {
 function exportReport(format) {
   const totalOrders = orders.length;
   const completedOrders = orders.filter(o => o.status === 'completed').length;
-  let totalRevenue = 0;
   
+  let totalRevenue = 0;
   orders.forEach(order => {
     if (order.items) {
       totalRevenue += order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
@@ -797,12 +870,11 @@ function exportReport(format) {
   const averageOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   
   if (format === 'csv') {
-    let csv = 'گزارش فروش - کافه رایکا\n';
+    let csv = 'گزارش فروش رستوران\n';
     csv += `تاریخ: ${new Date().toLocaleDateString('fa-IR')}\n\n`;
-    csv += 'آمار کلی\n';
     csv += `کل سفارش‌ها,${totalOrders}\n`;
     csv += `سفارش‌های تکمیل شده,${completedOrders}\n`;
-    csv += `کل درآمد,${totalRevenue}\n`;
+    csv += `کل درآمد,${Math.round(totalRevenue)}\n`;
     csv += `میانگین سفارش,${Math.round(averageOrder)}\n\n`;
     csv += 'جزئیات سفارش‌ها\n';
     csv += 'شماره سفارش,میز,تاریخ,وضعیت,جمع کل\n';
@@ -821,15 +893,6 @@ function exportReport(format) {
   }
 }
 
-function downloadFile(content, filename, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 // ============================================
 // 🔹 UTILITIES
